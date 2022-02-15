@@ -100,27 +100,29 @@ make_transect <- function(atl08_sf,
 }
 
 
-test <- unlist(mapply(function(x, y) x:y, x = tr_sf$segment_id_beg, y = tr_sf$segment_id_end, SIMPLIFY = FALSE))
+# Generate 20-m segments
 
-test_split <- sf::st_line_sample(tr_sf,
-                                 sample = c(0, 0.25, 0.5, 0.75, 1))
-
-test_split <- st_cast(test_split, "POINT")
-
-df <- data.frame(segment_id = test)
-df$geometry <- test_split
-st_geometry(df) <- test_split
-
-
-seg_sfg_list <- list()
-
-for(i in 1:length(x_start)) {
-  seg_sfg_list <- c(seg_sfg_list,
-                   list(sf::st_linestring(x = matrix(c(x_start[i], y_start[i], x_end[i], y_end[i]),
-                                                     byrow = TRUE,
-                                                     ncol = 2),
-                                          dim = "XY")))
-
-
-}
+# test <- unlist(mapply(function(x, y) x:y, x = tr_sf$segment_id_beg, y = tr_sf$segment_id_end, SIMPLIFY = FALSE))
+#
+# test_split <- sf::st_line_sample(tr_sf,
+#                                  sample = c(0, 0.25, 0.5, 0.75, 1))
+#
+# test_split <- st_cast(test_split, "POINT")
+#
+# df <- data.frame(segment_id = test)
+# df$geometry <- test_split
+# st_geometry(df) <- test_split
+#
+#
+# seg_sfg_list <- list()
+#
+# for(i in 1:length(x_start)) {
+#   seg_sfg_list <- c(seg_sfg_list,
+#                    list(sf::st_linestring(x = matrix(c(x_start[i], y_start[i], x_end[i], y_end[i]),
+#                                                      byrow = TRUE,
+#                                                      ncol = 2),
+#                                           dim = "XY")))
+#
+#
+# }
 

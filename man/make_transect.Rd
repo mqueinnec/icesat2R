@@ -4,7 +4,7 @@
 \alias{make_transect}
 \title{Generate LINESTRING from ATL08 center points}
 \usage{
-make_transect(in_shp, out_dir, tr_length = 100)
+make_transect(atl08_sf, out_dir, tr_length = 100)
 }
 \arguments{
 \item{out_dir}{Directory where output will be written (as gpkg file)}
