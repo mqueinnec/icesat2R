@@ -156,12 +156,12 @@ getGroundTrack <- function(file,
   # Create file to save outputs if not provided
   if(missing(filename_points)) filename_points = ""
   if (write & (gsub(" ", "", filename_points) == "" | is.null(filename_points)) ) {
-    filename_points <- paste0(tools::file_path_sans_ext(h5file_filter),"_points")
+    filename_points <- paste0(tools::file_path_sans_ext(basename(file)),"_points")
   }
 
   if(missing(filename_lines)) filename_lines = ""
   if (write & (gsub(" ", "", filename_lines) == "" | is.null(filename_lines)) ) {
-    filename_lines <- paste0(tools::file_path_sans_ext(h5file_filter),"_lines")
+    filename_lines <- paste0(tools::file_path_sans_ext(basename(file)),"_lines")
   }
 
 
@@ -198,14 +198,14 @@ getGroundTrack <- function(file,
       segment_ph_cnt <- as.numeric(rhdf5::h5read(file = file, name = paste0(n,"/geolocation/segment_ph_cnt")))
       segment_id <- as.character(rhdf5::h5read(file = file, name = paste0(n,"/geolocation/segment_id")))
 
-      temp_df <- data.frame(lon = ref_lon, lat = ref_lat, beam = n,segID = segment_id, segCount = segment_ph_cnt)
+      temp_df <- data.frame(lon = ref_lon, lat = ref_lat, beam = n,  beam_strength = beam_strength, segID = segment_id, segCount = segment_ph_cnt)
       temp_df <- temp_df[temp_df$segCount > 0, ]
 
       dat_ref_ph <- rbind(dat_ref_ph, temp_df)
 
 
       if (!all(segment_ph_cnt == 0)){
-        toAdd <- data.frame(beam = n)
+        toAdd <- data.frame(beam = n, beam_strength = beam_strength)
         rownames(toAdd) <- n
         att_table<- rbind(att_table, toAdd)
       }
@@ -214,16 +214,15 @@ getGroundTrack <- function(file,
       ref_lat <- as.numeric(rhdf5::h5read(file = file, name = paste0(n,"/land_segments/latitude")))
       ref_lon <- as.numeric(rhdf5::h5read(file = file, name = paste0(n,"/land_segments/longitude")))
 
-      temp_df <- data.frame(lon = ref_lon, lat = ref_lat, beam = n)
+      temp_df <- data.frame(lon = ref_lon, lat = ref_lat, beam = n, beam_strength = beam_strength)
       dat_ref_ph <- rbind(dat_ref_ph, temp_df)
 
-      toAdd <- data.frame(beam = n)
+      toAdd <- data.frame(beam = n, beam_strength = beam_strength)
       rownames(toAdd) <- n
       att_table<- rbind(att_table, toAdd)
     }
   }
 
-  dat_ref_ph$beam_strength <- beam_strength
   dat_ref_ph$rgt <- rgt
   dat_ref_ph$odir <- orbit_dir
   dat_ref_ph$cycle <- cycle
@@ -231,7 +230,7 @@ getGroundTrack <- function(file,
   dat_ref_ph$date_start <- date_start
   dat_ref_ph$date_end <- date_end
 
-  att_table$beam_strength <- beam_strength
+
   att_table$rgt <- rgt
   att_table$odir <- orbit_dir
   att_table$cycle <- cycle

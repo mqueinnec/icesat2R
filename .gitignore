@@ -2,3 +2,6 @@
 .Rhistory
 .RData
 .Ruserdata
+icesat2R.Rproj
+tests.R
+inst/doc

@@ -23,9 +23,9 @@ HighestPhotonWindow <- function(df,
     if(!is.character(keep_cols)){
       stop("keep_cols must be a character vector")
     }else{
-      kc <- keep_cols[keeps_cols %in% colnames(df)]
+      kc <- keep_cols[keep_cols %in% colnames(df)]
       if(length(kc) > 0) {
-        if(length(kc) != length(keep_columns)) {
+        if(length(kc) != length(keep_cols)) {
           warning(sprintf("%s if not in df",keep_cols[!keep_cols %in% kc]))
         }
         dat <- df[,c(h_norm, dist_along, beam_n, ph_id, ATL08_class, kc)]

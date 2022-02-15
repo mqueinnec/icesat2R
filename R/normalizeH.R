@@ -18,8 +18,9 @@ normalizeH <- function(df,
                        beam = c("gt1l", "gt1r", "gt2l", "gt2r", "gt3l", "gt3r"),
                        gap_dist = 10,
                        min_ph_gap = 20,
+                       method = "loess",
                        returnGaps = TRUE,
-                       keeps_cols,
+                       keep_cols,
                        dist_along = "cum_dist_along",
                        segment_id = "seg_id",
                        segment_idx = "seg_idx",
@@ -33,9 +34,9 @@ normalizeH <- function(df,
     if(!is.character(keep_cols)){
       stop("keep_cols must be a character vector")
     }else{
-      kc <- keep_cols[keeps_cols %in% colnames(df)]
+      kc <- keep_cols[keep_cols %in% colnames(df)]
       if(length(kc) > 0) {
-        if(length(kc) != length(keep_columns)) {
+        if(length(kc) != length(keep_cols)) {
           warning(sprintf("%s if not in df",keep_cols[!keep_cols %in% kc]))
         }
         dat <- df[,c(h, dist_along, segment_id, segment_idx, beam_n, ph_id, ATL08_class, kc)]
@@ -104,29 +105,36 @@ normalizeH <- function(df,
           # Ground surface interpolation
           dat_gap_ground <- dat_beam_ground[gaps_start[i]:gaps_end[i],]
 
-          calcSSE <- function(x){
-            loessMod <- try(loess(h ~ dist_along, data=dat_gap_ground, span=x, degree = 0), silent=T)
-            res <- try(loessMod$residuals, silent=T)
-            if(class(res)!="try-error"){
-              if((sum(!is.na(res)) > 0)){
-                sse <- sum(res^2)
+          dat_gap_all <- dplyr::filter(dat_beam, dist_along >= dat_beam_ground[gaps_start[i],"dist_along"] & dist_along <= dat_beam_ground[gaps_end[i],"dist_along"])
+
+          if (method == "loess") {
+            calcSSE <- function(x){
+              loessMod <- try(loess(h ~ dist_along, data=dat_gap_ground, span=x, degree = 0), silent=T)
+              res <- try(loessMod$residuals, silent=T)
+              if(class(res)!="try-error"){
+                if((sum(!is.na(res)) > 0)){
+                  sse <- sum(res^2)
+                }else{
+                  sse <- 99999
+                }
               }else{
                 sse <- 99999
               }
-            }else{
-              sse <- 99999
+              return(sse)
             }
-            return(sse)
+
+            opt <- optimize(calcSSE, lower = 0.0001, upper = 0.2)
+
+            loessMod <- loess(h ~ dist_along, data=dat_gap_ground, span=opt$minimum, degree = 0)
+
+            # Normalize height
+            dat_gap_all$h_norm <- dat_gap_all$h - predict(loessMod, dat_gap_all$dist_along)
+
+          }else if (method == "linear") {
+            hnorm <- approx(x = dat_gap_ground$dist_along, y = dat_gap_ground$h, xout = dat_gap_all$dist_along)
+            dat_gap_all$h_norm <- dat_gap_all$h - hnorm$y
           }
 
-          opt <- optimize(calcSSE, lower = 0.0001, upper = 0.2)
-
-          loessMod <- loess(h ~ dist_along, data=dat_gap_ground, span=opt$minimum, degree = 0)
-
-          # Normalize height
-          dat_gap_all <- dplyr::filter(dat_beam, dist_along >= dat_beam_ground[gaps_start[i],"dist_along"] & dist_along <= dat_beam_ground[gaps_end[i],"dist_along"])
-
-          dat_gap_all$h_norm <- dat_gap_all$h - predict(loessMod, dat_gap_all$dist_along)
 
           if (returnGaps) {
             out_gap[[i]] <- dat_gap_all

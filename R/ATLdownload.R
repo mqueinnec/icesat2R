@@ -10,9 +10,11 @@
 #'@param token Token required to access data using Eathdata login credentials
 #'@param version Dataset version number. Default is 002
 #'@param coverage Subsets dataset parameters (based on HDF5 dataset structure)
-#'@param projection Porjection of the output files.
+#'@param projection Projection of the output files.
 #'@param tempDir Full path to temporary folder where download request and eventually clipping shapefile will be saved
 #'@param dwlDir Full path to folder where data will be downloaded
+#'
+#'@export
 
 ATLdownload <- function(short_name,
                         bounding_box,
@@ -71,10 +73,10 @@ ATLdownload <- function(short_name,
   #Key-Value-Pairs
 
   kvp_def <- list(short_name = short_name,
-                  bounding_box = bounding_box,
-                  bbox = bbox,
-                  time = time,
-                  version = version,
+                  bounding_box = if(missing(bounding_box)) NULL else bounding_box,
+                  bbox = if(missing(bbox)) NULL else bbox,
+                  time = if(missing(time)) NULL else time,
+                  version = if(missing(version)) NULL else version,
                   coverage = if(missing(coverage)) NULL else coverage,
                   projection = if(missing(projection)) NULL else projection,
                   email = email,
@@ -82,8 +84,16 @@ ATLdownload <- function(short_name,
                   )
 
   if(doSHP) {
+    #If sf object transformn to sp
+    if (is(shapefile, "sf")){
+      if(sf::st_geometry_type(shapefile) == "POLYGON") {
+        shapefile <- sf::as_Spatial(shapefile)
+      }else{
+        stop("The sf shapefile object must have a POLYGON geometry type")
+      }
+    }
     #Check if SpatialPolygonsDataFrame
-    if(!is(shapefile, "SpatialPolygonsDataFrame")) stop("shapefile must contain a polygon")
+    if(!is(shapefile, "SpatialPolygonsDataFrame")) stop("shapefile must be a polygon")
     if(length(shapefile) == 0 | length(shapefile) == 0) stop("shapefile must contain only one feature")
     if(is.null(raster::crs(shapefile))){
       stop("shapefile must have a defined CRS")

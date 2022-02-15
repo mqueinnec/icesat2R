@@ -1,0 +1,82 @@
+---
+title: "read-icesat2-data"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{read-icesat2-data}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+```{r setup}
+library(icesat2R)
+
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+```
+
+# Data
+
+This tutorial uses one ATL03 HDF file and one ATL08 HDF file acquired across an approximately 3-km long ground track (in the along-track direction).
+
+```{r, echo = FALSE}
+xfun::embed_file("data/ATL_zipped")
+```
+
+# The ATL08 product
+
+## Read ATL08 HDF files
+
+The function `read_ATL08()` can be used to convert the HDF file into a R friendly format. The only required argument is `file`, which should be a path to a ATL08 `.h5` file (`ATL08_[yyyymmdd][hhmmss]_[ttttccss]_[vvv_rr].h5` or `processed_ATL08_[yyyymmdd][hhmmss]_[ttttccss]_[vvv_rr].h5`).
+
+The ATL08 algorithm classifies ATL03 photons as noise, ground, canopy or top of canopy and generates canopy and terrain height statistics along 100-m segments (5 x 20-m ATL03 segments). Therefore, one part of the data is delivered at the ATL03 photon level (classification per )
+
+The function converts the ATL08 data to two `data.frame` objects. The first data frame includes the ATL80 terrain and canopy height metrics generated at the 100-m segment intervals along with ancillary information. The second data frame includes the ATL08 classification as noise, ground, canopy or top of canopy of the ATL03 photons. Note that this `data.frame` does not includes the coordinates (lat/lon) of the classified photons since this information is contained in the ATL03 product. Each photon can be uniquely identified using a 20-m segment ID (`ph_segment_id`) and a counting index (`classed_pc_indx`) indicating the photon record within the given 20-m in the ATL03 product. 
+
+
+```{r}
+
+atl08_h5_file <- "ATL_zipped/processed_ATL08_20200821122613_08730802_004_01.h5"
+
+atl08_dat <- read_ATL08(file = atl08_h5_file)
+```
+
+The function`read_ATL08()` returns a `list` with one element per beam. For each beam, the element `ATL08` contains the `data.frame` with 100-m terrain and canopy height metrics. The `ATL08_sf` contains the same information but is returned as a georeferenced spatial object (`sf`). The last element
+
+## Generate ground tracks from ATL08 100-m segments center points
+
+```{r}
+ground_tracks <- make_transect(atl08_dat$gt1l$ATL08_sf)
+
+ground_tracks_all <- lapply(1:length(atl08_dat), function(x) {
+  obj <- atl08_dat[[x]]$ATL08_sf
+  out <- make_transect(obj)
+  return(out)
+})
+
+ground_tracks_all <- bind_rows(ground_tracks_all)
+
+mapview::mapview(ground_tracks_all)
+```
+
+# The ATL03 product
+
+## Read ATL03 HDF files
+
+```{r}
+atl03_h5_file <- "ATL_zipped/processed_ATL03_20200821122613_08730802_004_01.h5"
+
+atl03_dat <- read_ATL03(file = atl03_h5_file)
+
+```
+
+# Classified ATL03 product
+
+

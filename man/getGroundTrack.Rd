@@ -2,17 +2,35 @@
 % Please edit documentation in R/getGroundTrack.R
 \name{getGroundTrack}
 \alias{getGroundTrack}
-\title{Get the ground track of ATLAS beams based on ATL03 data product}
+\title{Get the ground track of ATLAS beams based on ATL03 ot ATL08 data product}
 \usage{
-getGroundTrack(ATL03, beam = c("gt1l", "gt1r", "gt2l", "gt2r", "gt3l",
-  "gt3r"), rgt = TRUE, cycle = TRUE, segment = TRUE, date = TRUE,
-  time = TRUE, points = FALSE, lines = TRUE, write = TRUE, outDir,
-  filename_points, filename_lines, ...)
+getGroundTrack(
+  file,
+  product,
+  beam = c("gt1l", "gt1r", "gt2l", "gt2r", "gt3l", "gt3r"),
+  beam_strength = c("weak", "strong"),
+  points = FALSE,
+  lines = TRUE,
+  df = TRUE,
+  write = TRUE,
+  outDir,
+  filename_points,
+  filename_lines,
+  ...
+)
 }
 \arguments{
-\item{ATL03}{Path to ATL03 HDF5 file (.h5 extension)}
+\item{file}{Path to ATL03 or ATL08 HDF5 file (.h5 extension)}
+
+\item{product}{Either "ATL03" or "ATL08"}
 
 \item{beam}{Character. List of beams for which groudn track needs to be extracted}
+
+\item{points}{Logical. Should each reference point be returned in a SpatialPointsDataFrame?}
+
+\item{lines}{Logical. Should lines features between all reference points be returned in a SpatialLinesDataFrame?}
+
+\item{...}{Parameters passed to writeOGR (e.g. overwrite_layer = TRUE)}
 
 \item{rgt}{Logical. Should RGT number be added as a field to output feature?}
 
@@ -23,13 +41,7 @@ getGroundTrack(ATL03, beam = c("gt1l", "gt1r", "gt2l", "gt2r", "gt3l",
 \item{date}{Logical. Should date be added as a field to output feature?}
 
 \item{time}{Logical. Should time be added as a field to output feature?}
-
-\item{points}{Logical. Should each reference point be returned in a SpatialPointsDataFrame?}
-
-\item{lines}{Logical. Should lines features between all reference points be returned in a SpatialLinesDataFrame?}
-
-\item{...}{Parameters passed to writeOGR (e.g. overwrite_layer = TRUE)}
 }
 \description{
-Get the ground track of ATLAS beams based on ATL03 data product
+Get the ground track of ATLAS beams based on ATL03 ot ATL08 data product
 }

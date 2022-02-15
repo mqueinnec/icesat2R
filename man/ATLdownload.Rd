@@ -4,8 +4,20 @@
 \alias{ATLdownload}
 \title{Downloads ATLAS data products with a curl request}
 \usage{
-ATLdownload(short_name, bounding_box, bbox, shapefile, time, token,
-  version, coverage, projection, tempDir, dwlDir, email = "yes")
+ATLdownload(
+  short_name,
+  bounding_box,
+  bbox,
+  shapefile,
+  time,
+  token,
+  version,
+  coverage,
+  projection,
+  tempDir,
+  dwlDir,
+  email = "yes"
+)
 }
 \arguments{
 \item{short_name}{Short name ID of the dataset. For example ATL03 or ATL08}
@@ -24,7 +36,7 @@ ATLdownload(short_name, bounding_box, bbox, shapefile, time, token,
 
 \item{coverage}{Subsets dataset parameters (based on HDF5 dataset structure)}
 
-\item{projection}{Porjection of the output files.}
+\item{projection}{Projection of the output files.}
 
 \item{tempDir}{Full path to temporary folder where download request and eventually clipping shapefile will be saved}
 
