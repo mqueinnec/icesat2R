@@ -9,8 +9,7 @@ read_ATL08(
   beam = c("gt1l", "gt1r", "gt2l", "gt2r", "gt3l", "gt3r"),
   beam_strength = c("weak", "strong"),
   lat_range,
-  odir_atl08,
-  odir_atl03_classified
+  odir
 )
 }
 \arguments{
@@ -22,9 +21,7 @@ read_ATL08(
 
 \item{lat_range}{Numeric vector. Lower and upper latitude to return}
 
-\item{odir_atl08}{Character. Output directory of ATL08 product}
-
-\item{odir_atl03_classified}{Character. Output directory of ATL03 classified photons}
+\item{odir}{Character. Output directory}
 }
 \description{
 Read ATL08 h5 file as a data frame

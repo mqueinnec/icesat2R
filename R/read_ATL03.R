@@ -4,7 +4,7 @@
 #' @param beam Character vector indicating beams to process
 #' @param beam_strength Character vector indicating the strength of beams to process
 #' @param lat_range Numeric vector. Lower and upper latitude to return
-#' @param odir_atl03 Character. Output directory of ATL03 product
+#' @param odir Character. Output directory of ATL03 product
 #'
 #' @export
 #'
@@ -13,7 +13,7 @@ read_ATL03 <- function(file,
                        beam = c("gt1l", "gt1r", "gt2l", "gt2r", "gt3l", "gt3r"),
                        beam_strength = c("weak", "strong"),
                        lat_range,
-                       odir_atl03) {
+                       odir) {
 
   # Check file input
   if(!is.character(file) | !tools::file_ext(file) == "h5") {
@@ -194,7 +194,7 @@ read_ATL03 <- function(file,
       heights_df$ph_segment_id <- seg_id_cum
       heights_df$classed_pc_indx <- seg_idx
 
-      heights_df <- inner_join(heights_df, select(geolocation_df, !delta_time), by = c("ph_segment_id" = "segment_id"))
+      heights_df <- inner_join(heights_df, dplyr::select(geolocation_df, !delta_time), by = c("ph_segment_id" = "segment_id"))
 
 
       # ----
@@ -219,14 +219,20 @@ read_ATL03 <- function(file,
         mutate(cum_dist_along = dist_ph_along + cum_segment_length) %>%
         relocate(cum_dist_along, .after = dist_ph_along)
 
+      # Initiate cum distance to 0
 
-      if(!missing(odir_atl03)) {
-        if(!dir.exists(odir_atl03)) {
-          dir.create(odir_atl03)
+      ref_dist <- atl03_out$cum_dist_along[1]
+
+      atl03_out <- atl03_out %>%
+        dplyr::mutate(cum_dist_along = cum_dist_along - ref_dist)
+
+      if(!missing(odir)) {
+        if(!dir.exists(odir)) {
+          dir.create(odir)
         }
 
         readr::write_csv(atl03_out,
-                         file = file.path(odir_atl03, stringr::str_c(tools::file_path_sans_ext(basename(file)), "_", toupper(n), "_", toupper(beam_strength_n),".csv")))
+                         file = file.path(odir, stringr::str_c(tools::file_path_sans_ext(basename(file)), "_", toupper(n), "_", toupper(beam_strength_n),".csv")))
       }
 
       out[[n]] <- atl03_out

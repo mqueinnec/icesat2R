@@ -10,6 +10,8 @@ make_transect <- function(atl08_sf,
                           out_dir,
                           tr_length = 100) {
 
+  base_name <- basename(atl08_sf)
+
   if (is.character(atl08_sf)) {
     if (tools::file_ext(atl08_sf) == "h5") {
 
@@ -90,7 +92,7 @@ make_transect <- function(atl08_sf,
 
     sf::st_write(tr_sf,
                  dsn = file.path(out_dir,
-                                 paste0(tools::file_path_sans_ext(basename(in_shp)), ".gpkg")),
+                                 paste0(tools::file_path_sans_ext(base_name), ".gpkg")),
                  driver = "GPKG",
                  delete_layer = TRUE)
   }

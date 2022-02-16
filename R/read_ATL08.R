@@ -4,8 +4,7 @@
 #' @param beam Character vector indicating beams to process
 #' @param beam_strength Character vector indicating the strength of beams to process
 #' @param lat_range Numeric vector. Lower and upper latitude to return
-#' @param odir_atl08 Character. Output directory of ATL08 product
-#' @param odir_atl03_classified Character. Output directory of ATL03 classified photons
+#' @param odir Character. Output directory
 #'
 #' @export
 
@@ -13,8 +12,7 @@ read_ATL08 <- function(file,
                        beam = c("gt1l", "gt1r", "gt2l", "gt2r", "gt3l", "gt3r"),
                        beam_strength = c("weak", "strong"),
                        lat_range,
-                       odir_atl08,
-                       odir_atl03_classified) {
+                       odir) {
 
   # Check file input
   if(!is.character(file) | !tools::file_ext(file) == "h5") {
@@ -238,20 +236,6 @@ read_ATL08 <- function(file,
                                remove = FALSE,
                                crs = sf::st_crs(4326))
 
-      if(!missing(odir_atl08)) {
-        if(!dir.exists(odir_atl08)) {
-          dir.create(odir_atl08)
-        }
-
-      readr::write_csv(atl08_out,
-                       file = file.path(odir_atl08, str_c(tools::file_path_sans_ext(basename(file)), "_", toupper(n), "_", toupper(beam_strength_n),".csv")))
-
-      sf::st_write(atl08_out_sf,
-                   dsn = file.path(odir_atl08, str_c(tools::file_path_sans_ext(basename(file)), "_", toupper(n), "_", toupper(beam_strength_n),".gpkg")),
-                   quiet = TRUE,
-                   delete_layer = TRUE)
-      }
-
       # ATL03 classified photons
 
       trg_fields <-  h5list %>%
@@ -300,8 +284,7 @@ read_ATL08 <- function(file,
         dplyr::filter(ph_segment_id %in% dplyr::all_of(all_seg))
 
 
-      atl03_cl_out <- cbind(data.frame(rgt = rgt,
-                                    cycle = cycle,
+      atl03_cl_out <- cbind(data.frame(cycle = cycle,
                                     region = region,
                                     beam = n,
                                     beam_strength = beam_strength_n),
@@ -311,13 +294,21 @@ read_ATL08 <- function(file,
                                                   pattern = "\\.",
                                                   replacement = "_")
 
-      if(!missing(odir_atl03_classified)) {
-        if(!dir.exists(odir_atl03_classified)) {
-          dir.create(odir_atl03_classified)
+      if(!missing(odir)) {
+        if(!dir.exists(odir)) {
+          dir.create(odir)
         }
 
+        readr::write_csv(atl08_out,
+                         file = file.path(odir_atl08, str_c(tools::file_path_sans_ext(basename(file)), "_", toupper(n), "_", toupper(beam_strength_n),".csv")))
+
+        sf::st_write(atl08_out_sf,
+                     dsn = file.path(odir_atl08, str_c(tools::file_path_sans_ext(basename(file)), "_", toupper(n), "_", toupper(beam_strength_n),".gpkg")),
+                     quiet = TRUE,
+                     delete_layer = TRUE)
+
         readr::write_csv(atl03_cl_out,
-                         file = file.path(odir_atl03_classified, str_c(tools::file_path_sans_ext(basename(file)), "_", toupper(n), "_", toupper(beam_strength_n),"_ATL03_class.csv")))
+                         file = file.path(odir, str_c(tools::file_path_sans_ext(basename(file)), "_", toupper(n), "_", toupper(beam_strength_n),"_ATL03_class.csv")))
 
       }
 
