@@ -495,6 +495,15 @@ classify_ATL03 <- function(atl03_h5,
 
       atl08_sf_proj <- cbind(atl08_sf_proj, data.frame(xy_rot))
 
+      atl08_sf_proj <- atl08_sf_proj %>%
+        dplyr::mutate(UTM_zone = zone,
+                      UTM_hemi = hemi) %>%
+        dplyr::relocate(rgt, .before = cycle) %>%
+        dplyr::relocate(c(latitude, longitude,
+                          UTM_zone, UTM_hemi,
+                          Easting, Northing,
+                          along_distance, across_distance), .after = beam_strength)
+
 
       # ATL03 classified photons
 
@@ -557,6 +566,13 @@ classify_ATL03 <- function(atl03_h5,
       classified_atl03 <- dplyr::left_join(heights_sf_proj,
                                             dplyr::select(signal_ph_df, !delta_time),
                                             by = c("ph_segment_id", "classed_pc_indx"))
+
+      classified_atl03 <- classified_atl03 %>%
+        dplyr::mutate(rgt = rgt, cycle = cycle, region = region, beam = n,
+                      beam_strength = beam_strength_n, UTM_zone = zone, UTM_hemi = hemi) %>%
+        dplyr::relocate(c(rgt, cycle, region, beam, beam_strength), .before = delta_time) %>%
+        dplyr::relocate(c(lat_ph, lon_ph, UTM_zone, UTM_hemi, Easting, Northing, along_distance, across_distance, classed_pc_flag),
+                        .after = beam_strength)
 
       # There might be some photons referenced in ATL03 but not in ATL08 (starting segment)
 

@@ -5,15 +5,16 @@
 \title{Read ATL08 h5 file as a data frame}
 \usage{
 read_ATL08(
-  file,
+  atl08_h5,
   beam = c("gt1l", "gt1r", "gt2l", "gt2r", "gt3l", "gt3r"),
   beam_strength = c("weak", "strong"),
   lat_range,
-  odir
+  odir,
+  atl03_pc = FALSE
 )
 }
 \arguments{
-\item{file}{Path to h5 file}
+\item{atl08_h5}{Path to h5 file}
 
 \item{beam}{Character vector indicating beams to process}
 
@@ -22,6 +23,8 @@ read_ATL08(
 \item{lat_range}{Numeric vector. Lower and upper latitude to return}
 
 \item{odir}{Character. Output directory}
+
+\item{atl03_pc}{Logical indicating if the classification of ATL03 photons should be returned}
 }
 \description{
 Read ATL08 h5 file as a data frame

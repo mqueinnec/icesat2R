@@ -1,25 +1,24 @@
 #' Read ATL08 h5 file as a data frame
 #'
-#' @param file Path to h5 file
+#' @param atl08_h5 Path to h5 file
 #' @param beam Character vector indicating beams to process
 #' @param beam_strength Character vector indicating the strength of beams to process
 #' @param lat_range Numeric vector. Lower and upper latitude to return
 #' @param odir Character. Output directory
+#' @param atl03_pc Logical indicating if the classification of ATL03 photons should be returned
 #'
 #' @export
 
-read_ATL08 <- function(file,
+read_ATL08 <- function(atl08_h5,
                        beam = c("gt1l", "gt1r", "gt2l", "gt2r", "gt3l", "gt3r"),
                        beam_strength = c("weak", "strong"),
                        lat_range,
-                       odir) {
+                       odir,
+                       atl03_pc = FALSE) {
 
   # Check file input
-  if(!is.character(file) | !tools::file_ext(file) == "h5") {
-    stop("file must be a HDF5 file name (extension h5)")
-  }else{
-    file <- normalizePath(file)
-    if(!file.exists(file)) stop("file  does not exist")
+  if (!is.character(atl08_h5) | !tools::file_ext(atl08_h5) == "h5") {
+    stop("atl08_h5 must be a path to a h5 file")
   }
 
   # Filter beams to analyze
@@ -27,18 +26,18 @@ read_ATL08 <- function(file,
     stop("beam_strength must contain weak, beam or both ")
   }
 
-    # Check beams to select
-    sc_orient <- as.numeric(rhdf5::h5read(file = file, name = "orbit_info/sc_orient"))
+  # Check beams to select
+  suppressWarnings(sc_orient <- as.numeric(rhdf5::h5read(file = atl08_h5, name = "orbit_info/sc_orient")))
 
-    if(sc_orient == 0) { # Backward
-      list_strength <- list(weak = c("gt1r", "gt2r", "gt3r"),
-                            strong = c("gt1l", "gt2l", "gt3l"))
-    }else{ #Forward
-      list_strength <- list(weak = c("gt1l", "gt2l", "gt3l"),
-                            strong = c("gt1r", "gt2r", "gt3r"))
-    }
+  if(sc_orient == 0) { # Backward
+    list_strength <- list(weak = c("gt1r", "gt2r", "gt3r"),
+                          strong = c("gt1l", "gt2l", "gt3l"))
+  }else{ #Forward
+    list_strength <- list(weak = c("gt1l", "gt2l", "gt3l"),
+                          strong = c("gt1r", "gt2r", "gt3r"))
+  }
 
-    if(length(beam_strength) == 1) {
+  if(length(beam_strength) == 1) {
 
     keep_beams <- beam %in% list_strength[[beam_strength]]
 
@@ -58,13 +57,13 @@ read_ATL08 <- function(file,
   }
 
   # Check that the necessary data is available
-  h5list <- rhdf5::h5ls(file)
+  atl08_h5list <- suppressWarnings(rhdf5::h5ls(atl08_h5))
 
   required <- c(paste0(beam,"/signal_photons/ph_segment_id"),
                 paste0(beam,"/signal_photons/classed_pc_indx"),
                 paste0(beam,"/signal_photons/classed_pc_flag"))
 
-  check <- paste0("/",required) %in% paste(h5list$group, h5list$name, sep = "/")
+  check <- paste0("/",required) %in% paste(atl08_h5list$group, atl08_h5list$name, sep = "/")
 
 
   if (any(check == FALSE)) {
@@ -74,9 +73,9 @@ read_ATL08 <- function(file,
   }
 
   # Retrieve RGT, region and cycle
-  rgt <- as.integer(rhdf5::h5read(file = file, name = "orbit_info/rgt"))
-  cycle <- as.integer(rhdf5::h5read(file = file, name = "orbit_info/cycle_number"))
-  region <- as.integer(rhdf5::h5read(file = file, name = "ancillary_data/start_region"))
+  suppressWarnings(rgt <- as.integer(rhdf5::h5read(file = atl08_h5, name = "orbit_info/rgt")))
+  suppressWarnings(cycle <- as.integer(rhdf5::h5read(file = atl08_h5, name = "orbit_info/cycle_number")))
+  suppressWarnings(region <- as.integer(rhdf5::h5read(file = atl08_h5, name = "ancillary_data/start_region")))
 
   out <- list() #Initiate list to return
 
@@ -84,39 +83,48 @@ read_ATL08 <- function(file,
 
     beam_strength_n <- names(list_strength)[unlist(lapply(list_strength, function(x) n %in% x))]
 
-    # Find all 100-m segment center points within lat_range
-    lat_center <- as.numeric(rhdf5::h5read(file = file, name = paste0(n,"/land_segments/latitude")))
+    print(sprintf("Working on beam %s (%s)", n, beam_strength_n))
 
-    if (any(is.na(lat_range))) {
-      lat_range <- c(min(lat_center), max(lat_center))
+    # Find all 100-m segment center points within lat_range
+    lat_center <- as.numeric(rhdf5::h5read(file = atl08_h5, name = paste0(n,"/land_segments/latitude")))
+
+    if (is.na(lat_range[1])) {
+      lat_range[1] <- min(lat_center)
+    }
+
+    if (is.na(lat_range[2])) {
+      lat_range[2] <- max(lat_center)
     }
 
     # Index of points to keep
-    #lat_idx <- which(lat_center >= lat_range[1] & lat_center <= lat_range[2])
-    lat_idx <- lat_center >= lat_range[1] & lat_center <= lat_range[2]
+    lat_idx <- which(lat_center >= lat_range[1] & lat_center <= lat_range[2])
 
     if (sum(lat_idx) != 0) {
-      beg_seg <- as.integer(rhdf5::h5read(file = file,
-                                          name = paste0(n,"/land_segments/segment_id_beg")))
-      end_seg <- as.integer(rhdf5::h5read(file = file,
-                                          name = paste0(n,"/land_segments/segment_id_end")))
 
-      all_seg <- beg_seg[which(lat_idx)[1]]:end_seg[which(lat_idx)[length(which(lat_idx))]]
 
       # Land segment flags and info
-      trg_fields <-  h5list %>%
-        dplyr::filter(stringr::str_detect(group, stringr::str_c(n, "/land_segments$")),
-                      otype == "H5I_DATASET") %>%
-                        dplyr::mutate(full_name = stringr::str_c(group, name, sep = "/"))
+      suppressWarnings(trg_fields <-  atl08_h5list %>%
+                         dplyr::filter(stringr::str_detect(group, stringr::str_c(n, "/land_segments$")),
+                                       otype == "H5I_DATASET") %>%
+                         dplyr::mutate(full_name = stringr::str_c(group, name, sep = "/")) %>%
+                         tidyr::separate(dim, into = c("dim1", "dim2"), sep = " x "))
 
       trg_fields_list <- lapply(1:length(trg_fields$name), function(x) {
-        out <- rhdf5::h5read(file = file,
-                      name = trg_fields$full_name[x])
+
+        if (any(is.na(c(trg_fields$dim1[x], trg_fields$dim2[x])))) {
+          trg_index <- list(lat_idx)
+        }else{
+          trg_index <- list(1:trg_fields$dim1[x], lat_idx)
+        }
+
+        suppressWarnings(out <- rhdf5::h5read(file = atl08_h5,
+                                              name = trg_fields$full_name[x],
+                                              index = trg_index))
 
         if(trg_fields$dclass[x] == "FLOAT") {
           if(length(dim(out)) > 1) {
             out <- as.data.frame(apply(out, 1, as.numeric))
-            colnames(out) <- str_c("X", 1:ncol(out))
+            colnames(out) <- stringr::str_c("X", 1:ncol(out))
 
           }else{
             out <- as.numeric(out)
@@ -124,7 +132,7 @@ read_ATL08 <- function(file,
         }else if (trg_fields$dclass[x] == "INTEGER") {
           if(length(dim(out)) > 1) {
             out <- as.data.frame(apply(out, 1, as.integer))
-            colnames(out) <- str_c("X", 1:ncol(out))
+            colnames(out) <- stringr::str_c("X", 1:ncol(out))
           }else{
             out <- as.integer(out)
           }
@@ -140,21 +148,28 @@ read_ATL08 <- function(file,
 
       # Canopy products
 
-      trg_fields <-  h5list %>%
-        dplyr::filter(stringr::str_detect(group, stringr::str_c(n, "/land_segments/canopy$")),
-                      otype == "H5I_DATASET") %>%
-        dplyr::mutate(full_name = stringr::str_c(group, name, sep = "/"))
+      suppressWarnings(trg_fields <-  atl08_h5list %>%
+                         dplyr::filter(stringr::str_detect(group, stringr::str_c(n, "/land_segments/canopy$")),
+                                       otype == "H5I_DATASET") %>%
+                         dplyr::mutate(full_name = stringr::str_c(group, name, sep = "/"))  %>%
+                         tidyr::separate(dim, into = c("dim1", "dim2"), sep = " x "))
 
       trg_fields_list <- lapply(1:length(trg_fields$name), function(x) {
-        out <- rhdf5::h5read(file = file,
-                             name = trg_fields$full_name[x])
 
+        if (any(is.na(c(trg_fields$dim1[x], trg_fields$dim2[x])))) {
+          trg_index <- list(lat_idx)
+        }else{
+          trg_index <- list(1:trg_fields$dim1[x], lat_idx)
+        }
 
+        suppressWarnings(out <- rhdf5::h5read(file = atl08_h5,
+                                              name = trg_fields$full_name[x],
+                                              index = trg_index))
 
         if(trg_fields$dclass[x] == "FLOAT") {
           if(length(dim(out)) > 1) {
             out <- as.data.frame(apply(out, 1, as.numeric))
-            colnames(out) <- str_c("X", 1:ncol(out))
+            colnames(out) <- stringr::str_c("X", 1:ncol(out))
 
           }else{
             out <- as.numeric(out)
@@ -162,7 +177,7 @@ read_ATL08 <- function(file,
         }else if (trg_fields$dclass[x] == "INTEGER") {
           if(length(dim(out)) > 1) {
             out <- as.data.frame(apply(out, 1, as.integer))
-            colnames(out) <- str_c("X", 1:ncol(out))
+            colnames(out) <- stringr::str_c("X", 1:ncol(out))
           }else{
             out <- as.integer(out)
           }
@@ -178,21 +193,28 @@ read_ATL08 <- function(file,
 
       # Terrain products
 
-      trg_fields <-  h5list %>%
-        dplyr::filter(stringr::str_detect(group, stringr::str_c(n, "/land_segments/terrain$")),
-                      otype == "H5I_DATASET") %>%
-        dplyr::mutate(full_name = stringr::str_c(group, name, sep = "/"))
+      suppressWarnings(trg_fields <-  atl08_h5list %>%
+                         dplyr::filter(stringr::str_detect(group, stringr::str_c(n, "/land_segments/terrain$")),
+                                       otype == "H5I_DATASET") %>%
+                         dplyr::mutate(full_name = stringr::str_c(group, name, sep = "/")) %>%
+                         tidyr::separate(dim, into = c("dim1", "dim2"), sep = " x "))
 
       trg_fields_list <- lapply(1:length(trg_fields$name), function(x) {
-        out <- rhdf5::h5read(file = file,
-                             name = trg_fields$full_name[x])
 
+        if (any(is.na(c(trg_fields$dim1[x], trg_fields$dim2[x])))) {
+          trg_index <- list(lat_idx)
+        }else{
+          trg_index <- list(1:trg_fields$dim1[x], lat_idx)
+        }
 
+        suppressWarnings(out <- rhdf5::h5read(file = atl08_h5,
+                                              name = trg_fields$full_name[x],
+                                              index = trg_index))
 
         if(trg_fields$dclass[x] == "FLOAT") {
           if(length(dim(out)) > 1) {
             out <- as.data.frame(apply(out, 1, as.numeric))
-            colnames(out) <- str_c("X", 1:ncol(out))
+            colnames(out) <- stringr::str_c("X", 1:ncol(out))
 
           }else{
             out <- as.numeric(out)
@@ -200,7 +222,7 @@ read_ATL08 <- function(file,
         }else if (trg_fields$dclass[x] == "INTEGER") {
           if(length(dim(out)) > 1) {
             out <- as.data.frame(apply(out, 1, as.integer))
-            colnames(out) <- str_c("X", 1:ncol(out))
+            colnames(out) <- stringr::str_c("X", 1:ncol(out))
           }else{
             out <- as.integer(out)
           }
@@ -216,8 +238,7 @@ read_ATL08 <- function(file,
 
       # ATL08 output
 
-      atl08_out <- cbind(data.frame(rgt = rgt,
-                              cycle = cycle,
+      atl08_out <- cbind(data.frame(cycle = cycle,
                               region = region,
                               beam = n,
                               beam_strength = beam_strength_n),
@@ -229,92 +250,162 @@ read_ATL08 <- function(file,
                                                   pattern = "\\.",
                                                   replacement = "_")
 
-      atl08_out <- atl08_out[lat_idx, ]
-
-      atl08_out_sf <- sf::st_as_sf(atl08_out,
+      atl08_sf <- sf::st_as_sf(atl08_out,
                                coords = c("longitude", "latitude"),
                                remove = FALSE,
                                crs = sf::st_crs(4326))
+      # Project to UTM Zone
+
+      zone <- find_UTM_zone(atl08_sf$longitude[1], atl08_sf$latitude[1])
+
+      hemi <- find_UTM_hemisphere(atl08_sf$latitude[1])
+
+      if (hemi == "N") {
+        if(stringr::str_length(zone) == 1) zone = stringr::str_c("0", zone, sep = "")
+        epsg_trg <- as.integer(stringr::str_c("326", zone, sep = ""))
+      }else{
+        if(stringr::str_length(zone) == 1) zone = stringr::str_c("0", zone, sep = "")
+        epsg_trg <- as.integer(stringr::str_c("327", zone, sep = ""))
+      }
+
+
+      atl08_sf_proj <- sf::st_transform(atl08_sf, epsg_trg)
+
+      atl08_sf_proj <- atl08_sf_proj %>%
+        dplyr::mutate(data.frame(sf::st_coordinates(atl08_sf_proj))) %>%
+        dplyr::rename(Easting = X,
+                      Northing = Y)
+
+      # Find rotation matrix and rotation points
+
+      rot_mat_list <- get_rot_matrix(xy_start = c(atl08_sf_proj$Easting[1], atl08_sf_proj$Northing[1]),
+                                     xy_end = c(atl08_sf_proj$Easting[nrow(atl08_sf_proj)],
+                                                atl08_sf_proj$Northing[nrow(atl08_sf_proj)]))
+
+      # Calculate along and across track
+
+      xy_rot <- get_along_distance(atl08_sf_proj$Easting,
+                                   atl08_sf_proj$Northing,
+                                   rot_mat_list$R_mat,
+                                   rot_mat_list$xRotPt,
+                                   rot_mat_list$yRotPt)
+
+      atl08_sf_proj <- cbind(atl08_sf_proj, data.frame(xy_rot))
+
 
       # ATL03 classified photons
+      if(atl03_pc) {
 
-      trg_fields <-  h5list %>%
-        dplyr::filter(stringr::str_detect(group, stringr::str_c(n, "/signal_photons")),
-                      otype == "H5I_DATASET") %>%
-        dplyr::mutate(full_name = stringr::str_c(group, name, sep = "/"))
+        beg_seg <- atl08_sf_proj$segment_id_beg
+        end_seg <- atl08_sf_proj$segment_id_end
 
-      trg_fields_list <- lapply(1:length(trg_fields$name), function(x) {
-        out <- rhdf5::h5read(file = file,
-                             name = trg_fields$full_name[x])
+        unique_segments <- beg_seg[1]:end_seg[length(end_seg)]
+
+        suppressWarnings(ph_segment_id <- rhdf5::h5read(atl08_h5,
+                                                        name = stringr::str_c(n, "/signal_photons/ph_segment_id")))
+
+        seg_idx <- which(ph_segment_id %in% unique_segments)
 
 
+        suppressWarnings(trg_fields <-  atl08_h5list %>%
+                           dplyr::filter(stringr::str_detect(group, stringr::str_c(n, "/signal_photons$")),
+                                         otype == "H5I_DATASET") %>%
+                           dplyr::mutate(full_name = stringr::str_c(group, name, sep = "/")) %>%
+                           tidyr::separate(dim, into = c("dim1", "dim2"), sep = " x "))
 
-        if(trg_fields$dclass[x] == "FLOAT") {
-          if(length(dim(out)) > 1) {
-            out <- as.data.frame(apply(out, 1, as.numeric))
-            colnames(out) <- str_c("X", 1:ncol(out))
+        trg_fields_list <- lapply(1:length(trg_fields$name), function(x) {
 
+          if (any(is.na(c(trg_fields$dim1[x], trg_fields$dim2[x])))) {
+            trg_index <- list(seg_idx)
           }else{
-            out <- as.numeric(out)
+            trg_index <- list(1:trg_fields$dim1[x], seg_idx)
           }
-        }else if (trg_fields$dclass[x] == "INTEGER") {
-          if(length(dim(out)) > 1) {
-            out <- as.data.frame(apply(out, 1, as.integer))
-            colnames(out) <- str_c("X", 1:ncol(out))
-          }else{
-            out <- as.integer(out)
+
+          suppressWarnings( out <- rhdf5::h5read(file = atl08_h5,
+                                                 name = trg_fields$full_name[x],
+                                                 index = trg_index))
+
+          if(trg_fields$dclass[x] == "FLOAT") {
+            if(length(dim(out)) > 1) {
+              out <- as.data.frame(apply(out, 1, as.numeric))
+              colnames(out) <- stringr::str_c("X", 1:ncol(out))
+
+            }else{
+              out <- as.numeric(out)
+            }
+          }else if (trg_fields$dclass[x] == "INTEGER") {
+            if(length(dim(out)) > 1) {
+              out <- as.data.frame(apply(out, 1, as.integer))
+              colnames(out) <- stringr::str_c("X", 1:ncol(out))
+            }else{
+              out <- as.integer(out)
+            }
           }
-        }
 
-        return(out)
+          return(out)
 
-      })
+        })
 
-      names(trg_fields_list) <- trg_fields$name
+        names(trg_fields_list) <- trg_fields$name
 
-      signal_ph_df <- as.data.frame(trg_fields_list)
+        signal_ph_df <- as.data.frame(trg_fields_list)
 
-      signal_ph_df <- signal_ph_df %>%
-        mutate(classed_pc_flag = factor(classed_pc_flag,
-                                        levels = c(0, 1, 2, 3),
-                                        labels = c("noise", "ground", "canopy", "top of canopy")))
+        signal_ph_df <- signal_ph_df %>%
+          dplyr::mutate(classed_pc_flag = factor(classed_pc_flag,
+                                                 levels = c(0, 1, 2, 3),
+                                                 labels = c("noise", "ground", "canopy", "top of canopy")))
 
-      # Filter from lat range
-      signal_ph_df <- signal_ph_df %>%
-        dplyr::filter(ph_segment_id %in% dplyr::all_of(all_seg))
+        atl03_cl_out <- cbind(data.frame(cycle = cycle,
+                                         region = region,
+                                         beam = n,
+                                         beam_strength = beam_strength_n),
+                              signal_ph_df)
 
+        colnames(atl03_cl_out) <- stringr::str_replace(colnames(atl03_cl_out),
+                                                       pattern = "\\.",
+                                                       replacement = "_")
 
-      atl03_cl_out <- cbind(data.frame(cycle = cycle,
-                                    region = region,
-                                    beam = n,
-                                    beam_strength = beam_strength_n),
-                         signal_ph_df)
+      }
 
-      colnames(atl03_cl_out) <- stringr::str_replace(colnames(atl03_cl_out),
-                                                  pattern = "\\.",
-                                                  replacement = "_")
+      # Clean column order
+
+      atl08_sf_proj <- atl08_sf_proj %>%
+        dplyr::mutate(UTM_zone = zone,
+               UTM_hemi = hemi) %>%
+        dplyr::relocate(rgt, .before = cycle) %>%
+        dplyr::relocate(c(latitude, longitude,
+                          UTM_zone, UTM_hemi,
+                          Easting, Northing,
+                          along_distance, across_distance), .after = beam_strength)
 
       if(!missing(odir)) {
         if(!dir.exists(odir)) {
           dir.create(odir)
         }
 
-        readr::write_csv(atl08_out,
-                         file = file.path(odir_atl08, str_c(tools::file_path_sans_ext(basename(file)), "_", toupper(n), "_", toupper(beam_strength_n),".csv")))
+        readr::write_csv(sf::st_drop_geometry(atl08_sf_proj),
+                         file = file.path(odir, stringr::str_c(tools::file_path_sans_ext(basename(atl08_h5)), "_", toupper(n), "_", toupper(beam_strength_n),".csv")))
 
-        sf::st_write(atl08_out_sf,
-                     dsn = file.path(odir_atl08, str_c(tools::file_path_sans_ext(basename(file)), "_", toupper(n), "_", toupper(beam_strength_n),".gpkg")),
+        sf::st_write(atl08_sf_proj,
+                     dsn = file.path(odir, stringr::str_c(tools::file_path_sans_ext(basename(atl08_h5)), "_", toupper(n), "_", toupper(beam_strength_n),".gpkg")),
                      quiet = TRUE,
                      delete_layer = TRUE)
 
-        readr::write_csv(atl03_cl_out,
-                         file = file.path(odir, str_c(tools::file_path_sans_ext(basename(file)), "_", toupper(n), "_", toupper(beam_strength_n),"_ATL03_class.csv")))
-
+        if(atl03_pc) {
+          readr::write_csv(atl03_cl_out,
+                           file = file.path(odir, stringr::str_c(tools::file_path_sans_ext(basename(atl08_h5)), "_", toupper(n), "_", toupper(beam_strength_n),"_ATL03_class.csv")))
+        }
       }
 
-      out[[n]] <- list(ATL08 = atl08_out,
-                       ATL08_sf = atl08_out_sf,
-                       ATL03_cl = atl03_cl_out)
+      if(atl03_pc) {
+        out[[n]] <- list(ATL08 = sf::st_drop_geometry(atl08_sf_proj),
+                         ATL08_sf = atl08_sf_proj,
+                         ATL03_cl = atl03_cl_out)
+      }else{
+        out[[n]] <- list(ATL08 = sf::st_drop_geometry(atl08_sf_proj),
+                         ATL08_sf = atl08_sf_proj)
+      }
+
     }else{
       warning(sprintf("No photons to return within specified lat_range for beam %s", n))
     }
